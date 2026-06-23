@@ -1,0 +1,34 @@
+# =============================================================================
+#  api-gateway.yml — served by the Config Server to the gateway module
+#  Accessed at: GET http://localhost:8888/api-gateway/default
+#
+#  This file will hold ALL environment-specific overrides in Phase 4.
+#  For Phase 1 it serves as a minimal placeholder confirming the config
+#  pipeline is connected and working.
+# =============================================================================
+
+# ── Rate Limit Tiers (Phase 4 Dynamic Configuration) ────────────────────────
+# These values map directly to RateLimitProperties.TierConfig in the gateway.
+# Changing these and calling /actuator/refresh on the gateway will reload them.
+rate-limit:
+  default-config:
+    replenish-rate: 10
+    burst-capacity: 20
+  tiers:
+    FREE:
+      replenish-rate: 12
+      burst-capacity: 20
+    PRO:
+      replenish-rate: 100
+      burst-capacity: 200
+    ENTERPRISE:
+      replenish-rate: 1000
+      burst-capacity: 2000
+    ANONYMOUS:
+      replenish-rate: 2
+      burst-capacity: 5
+
+# ── Downstream Service URL override ───────────────────────────────────────
+downstream:
+  service:
+    url: http://localhost:8081

@@ -1,0 +1,118 @@
+# =============================================================================
+#  API Gateway – Application Configuration
+#  Module: gateway  |  Phase: 4 (Dynamic Config/Tiered Limits)
+# =============================================================================
+
+server:
+  port: 8080
+  # Netty (reactive) tuning — adjust based on CPU core count in production
+  netty:
+    connection-timeout: 5000ms
+    idle-timeout: 60000ms
+
+spring:
+  application:
+    name: api-gateway
+
+  # ── Redis ──────────────────────────────────────────────────────────────────
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      # password: ${REDIS_PASSWORD:}   # uncomment for production
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 2
+          max-wait: 1000ms
+
+  # ── Spring Cloud Gateway ───────────────────────────────────────────────────
+  cloud:
+    gateway:
+      # Global CORS policy — tighten origins in production
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            maxAge: 3600
+
+      # Default filters applied to every route
+      default-filters:
+        # Forwards the original client Host header
+        - PreserveHostHeader
+        # Adds a unique request ID for distributed tracing
+        - AddRequestHeader=X-Gateway-Request-Id, ${random.uuid}
+
+      # Metrics for every route (accessible at /actuator/gateway)
+      metrics:
+        enabled: true
+
+      # HttpClient tuning (Netty client used to call downstream)
+      httpclient:
+        connect-timeout: 3000
+        response-timeout: 10s
+        pool:
+          type: elastic
+          max-connections: 500
+
+  # ── Config Server (Phase 4) ────────────────────────────────────────────────
+  # Enforce the config server dependency.
+  config:
+    import: "configserver:${CONFIG_SERVER_URL:http://localhost:8888}"
+
+# ── Actuator / Management ──────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, gateway, metrics, prometheus, refresh
+  endpoint:
+    health:
+      show-details: always
+    gateway:
+      enabled: true
+  health:
+    # Enable clientConfigServer in Phase 4 since config server is available
+    clientConfigServer:
+      enabled: true
+    discoveryComposite:
+      enabled: false
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+  tracing:
+    sampling:
+      probability: 1.0   # 100% sampling — reduce in production
+
+# ── Downstream Service ─────────────────────────────────────────────────────
+downstream:
+  service:
+    url: ${DOWNSTREAM_SERVICE_URL:http://localhost:8081}
+
+# ── JWT Properties (Phase 2) ──────────────────────────────────────────────────
+jwt:
+  # IMPORTANT: Override via JWT_SECRET env var in production.
+  secret: ${JWT_SECRET:dGhpc0lzQURldmVsb3BtZW50U2VjcmV0S2V5Rm9yVGVzdGluZzEyMzQ1Njc4}
+  expiration-ms: 3600000   # 1 hour (3 600 000 ms)
+
+# Note: The rate-limit block has been moved to the Config Server (Phase 4).
+
+# ── Logging ────────────────────────────────────────────────────────────────
+logging:
+  level:
+    root: INFO
+    com.apigateway: DEBUG
+    org.springframework.cloud.gateway: DEBUG
+    io.lettuce.core: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{correlationId}] %logger{36} - %msg%n"

@@ -1,0 +1,46 @@
+# =============================================================================
+#  Config Server – Application Configuration
+#  Port 8888 — the standard Spring Cloud Config Server port
+# =============================================================================
+
+server:
+  port: 8888
+
+spring:
+  application:
+    name: config-server
+
+  cloud:
+    config:
+      server:
+        # ── Native (filesystem) back-end — for local development ──────────────
+        # Points to the config-repo directory inside this module.
+        # The server looks for files matching: {application}-{profile}.yml
+        # Example: api-gateway.yml, api-gateway-production.yml
+        native:
+          # In development, we use a mounted volume so host edits reflect instantly
+          search-locations: file:/config-repo/
+        # ── Git back-end (recommended for production) ─────────────────────────
+        # Uncomment and configure for a real deployment. Git-backed config
+        # provides audit trails, PR-based review, and instant rollback.
+        #
+        # git:
+        #   uri: ${CONFIG_GIT_URI:https://github.com/your-org/api-gateway-config}
+        #   default-label: main
+        #   search-paths: "{application}"
+        #   clone-on-start: true
+
+  # Use the native profile locally
+  profiles:
+    active: native
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+
+logging:
+  level:
+    root: INFO
+    org.springframework.cloud.config: DEBUG

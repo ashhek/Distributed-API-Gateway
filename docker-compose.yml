@@ -1,0 +1,135 @@
+# =============================================================================
+#  docker-compose.yml — API Gateway Full Stack
+#  Phase 3: Gateway + Downstream + Redis
+# =============================================================================
+#
+#  Services:
+#    redis              – Token bucket state store (port 6379)
+#    downstream-service – Mock backend microservice (port 8081)
+#    gateway            – Spring Cloud Gateway + JWT + Rate Limiter (port 8080)
+#    config-server      – Spring Cloud Config (port 8888, Phase 4 only)
+#
+#  Usage:
+#    # Phase 3 stack (Redis + downstream + gateway):
+#    docker-compose up --build
+#
+#    # Tear down + remove volumes:
+#    docker-compose down -v
+#
+#    # Rebuild a single service:
+#    docker-compose up --build gateway
+#
+#  IMPORTANT: Build contexts are all set to the project root (.)
+#  because the Dockerfiles need access to the parent pom.xml.
+# =============================================================================
+
+version: "3.9"
+
+networks:
+  gateway-net:
+    driver: bridge
+
+volumes:
+  redis-data:
+
+services:
+
+  # ── Redis ──────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7.2-alpine
+    container_name: api-gateway-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: >
+      redis-server
+      --save 60 1
+      --loglevel warning
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - gateway-net
+    restart: unless-stopped
+
+  # ── Downstream Service ─────────────────────────────────────────────────────
+  downstream-service:
+    build:
+      # Context is project root so Dockerfile can access parent pom.xml
+      context: .
+      dockerfile: downstream-service/Dockerfile
+    container_name: api-gateway-downstream
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - gateway-net
+    restart: unless-stopped
+
+  # ── API Gateway ────────────────────────────────────────────────────────────
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    container_name: api-gateway-core
+    ports:
+      - "8080:8080"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - DOWNSTREAM_SERVICE_URL=http://downstream-service:8081
+      # JWT secret — override in production via secrets manager
+      - JWT_SECRET=dGhpc0lzQURldmVsb3BtZW50U2VjcmV0S2V5Rm9yVGVzdGluZzEyMzQ1Njc4
+      # Phase 4: config server integration
+      - CONFIG_SERVER_URL=http://config-server:8888
+    volumes:
+      # Phase 5: Map config-repo so AdminController can edit the file live
+      - ./config-server/src/main/resources/config-repo:/config-repo
+    depends_on:
+      redis:
+        condition: service_healthy
+      downstream-service:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/gateway/info || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 45s
+    networks:
+      - gateway-net
+    restart: unless-stopped
+
+  # ── Spring Cloud Config Server (Phase 4) ──────────────────────────────────
+  config-server:
+    build:
+      context: .
+      dockerfile: config-server/Dockerfile
+    container_name: api-gateway-config-server
+    ports:
+      - "8888:8888"
+    environment:
+      - SPRING_PROFILES_ACTIVE=native
+    volumes:
+      - ./config-server/src/main/resources/config-repo:/config-repo
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8888/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - gateway-net
+    restart: unless-stopped

@@ -1,0 +1,34 @@
+# IDE / Editor Files
+.idea/
+.vscode/
+*.iml
+.antigravity/
+
+# Maven / Build Artifacts
+target/
+**/target/
+*.jar
+*.war
+*.ear
+*.class
+
+# Logs
+*.log
+
+# OS Junk
+.DS_Store
+Thumbs.db
+ehthumbs.db
+.AppleDouble
+.LSOverride
+Icon
+
+# Environment / Local Configuration
+.env
+.env.*
+!.env.example
+
+# Temporary files
+*.swp
+*.swo
+*~

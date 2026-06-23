@@ -1,0 +1,25 @@
+# =============================================================================
+#  Downstream Service – Application Configuration
+#  Port 8081 — only reachable internally via the gateway
+# =============================================================================
+
+server:
+  port: 8081
+
+spring:
+  application:
+    name: downstream-service
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    root: INFO
+    com.apigateway.downstream: DEBUG

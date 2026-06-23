@@ -1,0 +1,27 @@
+# =============================================================================
+#  application-test.yml
+#  Spring profile for unit/integration tests — disables external dependencies
+#  (Redis, Config Server) so tests can run in a clean CI environment.
+# =============================================================================
+
+spring:
+  cloud:
+    gateway:
+      # Disable config server import in tests
+      config:
+        enabled: false
+  data:
+    redis:
+      # Use an ephemeral port — the context will fail gracefully if Redis
+      # is not running because we set lazy-init on the connection factory.
+      host: localhost
+      port: 6379
+
+  # Prevent the gateway from trying to contact the config server at test time
+  config:
+    import: "optional:configserver:"
+
+logging:
+  level:
+    root: WARN
+    com.apigateway: DEBUG

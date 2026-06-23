@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gateway Command Center</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        background: '#09090b',
+                        surface: '#0f172a',
+                        border: '#1e293b',
+                        emerald: { 400: '#34d399', 500: '#10b981' },
+                        rose: { 400: '#fb7185', 500: '#f43f5e' },
+                        electric: { 400: '#3b82f6', 500: '#2563eb' }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['Fira Code', 'Menlo', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #09090b; color: #f8fafc; }
+        .glass-panel { background: rgba(15, 23, 42, 0.4); border: 1px solid #1e293b; }
+        .interactive-card { transition: all 0.2s ease; }
+        .interactive-card:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.1); }
+        .input-inset { background: #09090b; border: 1px solid #1e293b; color: #e2e8f0; transition: all 0.2s; }
+        .input-inset:focus { border-color: #3b82f6; outline: none; box-shadow: 0 0 0 1px #3b82f6; }
+        
+        /* Terminal scrollbar */
+        #terminal::-webkit-scrollbar { width: 6px; }
+        #terminal::-webkit-scrollbar-track { background: transparent; }
+        #terminal::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+    </style>
+</head>
+<body class="min-h-screen p-6 md:p-8 flex flex-col">
+
+    <div class="max-w-[1400px] w-full mx-auto flex-1 flex flex-col space-y-6">
+        
+        <!-- Top Status Bar -->
+        <header class="flex justify-between items-center pb-6 border-b border-border">
+            <div class="flex items-center space-x-4">
+                <div class="w-10 h-10 bg-gradient-to-br from-electric-500 to-emerald-500 rounded-lg shadow-lg flex items-center justify-center">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold tracking-tight text-white">API Gateway</h1>
+                    <p class="text-sm text-slate-400">Command Center</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-3 bg-surface border border-border px-4 py-2 rounded-full">
+                <span class="flex h-2.5 w-2.5 relative">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+                <span class="text-sm font-medium tracking-wide text-slate-300">System Online: Connected to Redis cluster</span>
+            </div>
+        </header>
+
+        <!-- Main Layout -->
+        <div class="grid grid-cols-1 xl:grid-cols-4 gap-6 flex-1">
+            
+            <!-- Left Content (Metrics, Chart, Terminal) -->
+            <div class="xl:col-span-3 space-y-6 flex flex-col">
+                
+                <!-- KPI Cards -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="glass-panel p-5 rounded-xl interactive-card border-l-2 border-l-emerald-500">
+                        <h3 class="text-xs uppercase tracking-wider font-semibold text-slate-400">Total Allowed</h3>
+                        <div class="mt-2 flex items-baseline space-x-2">
+                            <p class="text-4xl font-bold text-white tracking-tight" id="statAllowed">0</p>
+                            <span class="text-sm text-emerald-400 font-medium">requests</span>
+                        </div>
+                    </div>
+                    <div class="glass-panel p-5 rounded-xl interactive-card border-l-2 border-l-rose-500">
+                        <h3 class="text-xs uppercase tracking-wider font-semibold text-slate-400">Total Rejected (429)</h3>
+                        <div class="mt-2 flex items-baseline space-x-2">
+                            <p class="text-4xl font-bold text-white tracking-tight" id="statRejected">0</p>
+                            <span class="text-sm text-rose-400 font-medium">requests</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Real-Time RPS Chart -->
+                <div class="glass-panel p-5 rounded-xl flex-1 min-h-[300px] flex flex-col relative">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-sm font-medium text-white flex items-center">
+                            <svg class="w-4 h-4 mr-2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
+                            Real-Time Traffic (RPS)
+                        </h3>
+                        <div class="flex space-x-4 text-xs font-medium">
+                            <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-emerald-500 mr-2"></span>Allowed</span>
+                            <span class="flex items-center"><span class="w-2 h-2 rounded-full bg-rose-500 mr-2"></span>Rejected</span>
+                        </div>
+                    </div>
+                    <div class="flex-1 w-full relative">
+                        <canvas id="rpsChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Live Activity Terminal -->
+                <div class="glass-panel rounded-xl overflow-hidden flex flex-col h-64">
+                    <div class="bg-surface px-4 py-2 border-b border-border flex items-center justify-between">
+                        <h3 class="text-xs font-semibold text-slate-400 tracking-wider">LIVE ACTIVITY LOG</h3>
+                        <div class="flex space-x-1.5">
+                            <div class="w-2.5 h-2.5 rounded-full bg-slate-600"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-slate-600"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-slate-600"></div>
+                        </div>
+                    </div>
+                    <div id="terminal" class="p-4 flex-1 overflow-y-auto font-mono text-[11px] leading-relaxed text-slate-300 bg-[#000000]">
+                        <div class="text-electric-400 mb-2">Connecting to observability stream... established.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Sidebar (Config Form) -->
+            <div class="xl:col-span-1">
+                <div class="glass-panel p-6 rounded-xl h-full sticky top-6">
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold text-white">Rate Limit Policies</h3>
+                        <p class="text-xs text-slate-400 mt-1">Live synchronized via @RefreshScope.</p>
+                    </div>
+                    
+                    <form id="policyForm" class="space-y-6">
+                        
+                        <!-- FREE Tier -->
+                        <div class="space-y-4 relative">
+                            <div class="absolute -left-3 top-0 bottom-0 w-1 bg-slate-800 rounded-full"></div>
+                            <h4 class="font-medium text-sm text-slate-200">FREE Tier</h4>
+                            
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="text-[11px] uppercase tracking-wider font-medium text-slate-400 mb-1 block">Replenish Rate (req/sec)</label>
+                                    <input type="number" id="freeReplenish" class="w-full input-inset rounded-md px-3 py-2 text-sm" required>
+                                </div>
+                                <div>
+                                    <label class="text-[11px] uppercase tracking-wider font-medium text-slate-400 mb-1 block">Burst Capacity</label>
+                                    <input type="number" id="freeBurst" class="w-full input-inset rounded-md px-3 py-2 text-sm" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="h-px w-full bg-border"></div>
+
+                        <!-- PRO Tier -->
+                        <div class="space-y-4 relative">
+                            <div class="absolute -left-3 top-0 bottom-0 w-1 bg-electric-500 rounded-full"></div>
+                            <h4 class="font-medium text-sm text-electric-400">PRO Tier</h4>
+                            
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="text-[11px] uppercase tracking-wider font-medium text-slate-400 mb-1 block">Replenish Rate (req/sec)</label>
+                                    <input type="number" id="proReplenish" class="w-full input-inset rounded-md px-3 py-2 text-sm" required>
+                                </div>
+                                <div>
+                                    <label class="text-[11px] uppercase tracking-wider font-medium text-slate-400 mb-1 block">Burst Capacity</label>
+                                    <input type="number" id="proBurst" class="w-full input-inset rounded-md px-3 py-2 text-sm" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-4">
+                            <button type="submit" id="saveBtn" class="relative w-full bg-slate-100 hover:bg-white text-slate-900 font-semibold py-2.5 rounded-md transition-all active:scale-[0.98] overflow-hidden flex justify-center items-center">
+                                <span id="saveBtnText" class="text-sm">Deploy Configuration</span>
+                                <svg id="saveSpinner" class="animate-spin hidden h-4 w-4 text-slate-900 absolute" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </button>
+                            <p id="saveStatus" class="text-xs text-center mt-3 font-medium hidden"></p>
+                        </div>
+
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // -- Theme configuration --
+        Chart.defaults.color = '#64748b';
+        Chart.defaults.font.family = 'Inter';
+
+        // -- State --
+        let prevAllowed = null;
+        let prevRejected = null;
+        const POLLING_INTERVAL = 2000; // ms
+
+        // -- Initialize Chart.js --
+        const ctx = document.getElementById('rpsChart').getContext('2d');
+        
+        // Gradient for Allowed
+        const gradientAllowed = ctx.createLinearGradient(0, 0, 0, 400);
+        gradientAllowed.addColorStop(0, 'rgba(16, 185, 129, 0.5)'); // emerald-500
+        gradientAllowed.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+
+        // Gradient for Rejected
+        const gradientRejected = ctx.createLinearGradient(0, 0, 0, 400);
+        gradientRejected.addColorStop(0, 'rgba(244, 63, 94, 0.5)'); // rose-500
+        gradientRejected.addColorStop(1, 'rgba(244, 63, 94, 0.0)');
+
+        const maxDataPoints = 30; // 60 seconds of history at 2s interval
+        const labels = Array(maxDataPoints).fill('');
+        const dataAllowed = Array(maxDataPoints).fill(0);
+        const dataRejected = Array(maxDataPoints).fill(0);
+
+        const rpsChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Allowed RPS',
+                        data: dataAllowed,
+                        borderColor: '#10b981', // emerald-500
+                        backgroundColor: gradientAllowed,
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        pointHoverRadius: 4,
+                        fill: true,
+                        tension: 0.4
+                    },
+                    {
+                        label: 'Rejected RPS',
+                        data: dataRejected,
+                        borderColor: '#f43f5e', // rose-500
+                        backgroundColor: gradientRejected,
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        pointHoverRadius: 4,
+                        fill: true,
+                        tension: 0.4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: {
+                    duration: 0 // Disable animation for smoother sliding effect
+                },
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                        titleColor: '#fff',
+                        bodyColor: '#cbd5e1',
+                        borderColor: '#1e293b',
+                        borderWidth: 1,
+                        padding: 10
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false, drawBorder: false },
+                        ticks: { display: false }
+                    },
+                    y: {
+                        grid: { color: 'rgba(30, 41, 59, 0.5)', drawBorder: false },
+                        beginAtZero: true,
+                        suggestedMax: 10
+                    }
+                }
+            }
+        });
+
+        // -- Terminal Logic --
+        const terminal = document.getElementById('terminal');
+        
+        function getTimestamp() {
+            const now = new Date();
+            return now.toISOString().replace('T', ' ').substring(0, 19);
+        }
+
+        function appendLog(type, count) {
+            for(let i=0; i<Math.min(count, 5); i++) {
+                const div = document.createElement('div');
+                const id = Math.floor(Math.random() * 9000) + 1000;
+                
+                if (type === 'ALLOWED') {
+                    div.innerHTML = `<span class="text-slate-500">[${getTimestamp()}]</span> <span class="text-emerald-400">HTTP 200</span> | <span class="text-emerald-500">ALLOWED</span> | Key: usr_free_${id}`;
+                } else {
+                    div.innerHTML = `<span class="text-slate-500">[${getTimestamp()}]</span> <span class="text-rose-400">HTTP 429</span> | <span class="text-rose-500 font-bold">BLOCKED</span> | Key: usr_free_${id} -> Bucket Exhausted`;
+                }
+                
+                terminal.appendChild(div);
+            }
+            
+            if (count > 5) {
+                const div = document.createElement('div');
+                div.className = "text-slate-500 italic";
+                div.innerText = `... and ${count - 5} more similar requests`;
+                terminal.appendChild(div);
+            }
+
+            // Auto-scroll
+            terminal.scrollTop = terminal.scrollHeight;
+            
+            // Limit lines
+            while (terminal.children.length > 50) {
+                terminal.removeChild(terminal.firstChild);
+            }
+        }
+
+        // -- Data Fetching & UI Update --
+        async function updateDashboard() {
+            try {
+                const res = await fetch('/admin/metrics');
+                const data = await res.json();
+                
+                const currentAllowed = data.allowed || 0;
+                const currentRejected = data.rejected || 0;
+
+                // Update Total Counters
+                document.getElementById('statAllowed').innerText = currentAllowed.toLocaleString();
+                document.getElementById('statRejected').innerText = currentRejected.toLocaleString();
+
+                // Calculate RPS
+                if (prevAllowed !== null && prevRejected !== null) {
+                    const deltaAllowed = currentAllowed - prevAllowed;
+                    const deltaRejected = currentRejected - prevRejected;
+                    
+                    const rpsAllowed = deltaAllowed / (POLLING_INTERVAL / 1000);
+                    const rpsRejected = deltaRejected / (POLLING_INTERVAL / 1000);
+
+                    // Update Chart
+                    dataAllowed.push(rpsAllowed);
+                    dataAllowed.shift();
+                    dataRejected.push(rpsRejected);
+                    dataRejected.shift();
+                    rpsChart.update();
+
+                    // Update Terminal
+                    if (deltaAllowed > 0) appendLog('ALLOWED', deltaAllowed);
+                    if (deltaRejected > 0) appendLog('REJECTED', deltaRejected);
+                }
+
+                prevAllowed = currentAllowed;
+                prevRejected = currentRejected;
+
+            } catch (err) {
+                console.error("Dashboard sync failed:", err);
+            }
+        }
+
+        async function fetchPolicies() {
+            try {
+                const res = await fetch('/admin/policies');
+                const data = await res.json();
+                
+                document.getElementById('freeReplenish').value = data.FREE.replenishRate;
+                document.getElementById('freeBurst').value = data.FREE.burstCapacity;
+                
+                document.getElementById('proReplenish').value = data.PRO.replenishRate;
+                document.getElementById('proBurst').value = data.PRO.burstCapacity;
+            } catch (err) {
+                console.error("Policy sync failed:", err);
+            }
+        }
+
+        // -- Form Submission --
+        document.getElementById('policyForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const btn = document.getElementById('saveBtn');
+            const btnText = document.getElementById('saveBtnText');
+            const spinner = document.getElementById('saveSpinner');
+            const status = document.getElementById('saveStatus');
+            
+            // Loading state
+            btn.disabled = true;
+            btnText.classList.add('opacity-0');
+            spinner.classList.remove('hidden');
+
+            const payload = {
+                FREE: {
+                    replenishRate: parseInt(document.getElementById('freeReplenish').value),
+                    burstCapacity: parseInt(document.getElementById('freeBurst').value)
+                },
+                PRO: {
+                    replenishRate: parseInt(document.getElementById('proReplenish').value),
+                    burstCapacity: parseInt(document.getElementById('proBurst').value)
+                }
+            };
+
+            try {
+                const res = await fetch('/admin/policies', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                status.classList.remove('hidden', 'text-rose-400');
+                if (res.ok) {
+                    status.classList.add('text-emerald-400');
+                    status.innerText = 'Deployed successfully to @RefreshScope';
+                    
+                    const div = document.createElement('div');
+                    div.innerHTML = `<span class="text-slate-500">[${getTimestamp()}]</span> <span class="text-electric-400">SYS_ADMIN</span> | CONFIG_UPDATED | Spring Cloud Context Refreshed`;
+                    terminal.appendChild(div);
+                    terminal.scrollTop = terminal.scrollHeight;
+                } else {
+                    status.classList.add('text-rose-400');
+                    status.innerText = 'Deployment failed.';
+                }
+            } catch (err) {
+                status.classList.remove('hidden');
+                status.classList.add('text-rose-400');
+                status.innerText = 'Network error.';
+            } finally {
+                // Restore state
+                btn.disabled = false;
+                btnText.classList.remove('opacity-0');
+                spinner.classList.add('hidden');
+                setTimeout(() => status.classList.add('hidden'), 3000);
+            }
+        });
+
+        // -- Bootstrap --
+        fetchPolicies();
+        updateDashboard();
+        setInterval(updateDashboard, POLLING_INTERVAL);
+
+    </script>
+</body>
+</html>
