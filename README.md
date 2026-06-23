@@ -3,6 +3,8 @@
 ## 🚀 Project Executive Summary
 A high-performance, containerized API Gateway built to handle **1M+ requests per day** with minimal latency overhead. Designed as a robust edge proxy for microservices, this gateway implements stateless authentication, distributed request throttling, and live configuration reloading. It seamlessly routes traffic while aggressively protecting downstream services from volumetric bursts, DDOS attacks, and cascading failures.
 
+![Gateway Admin Dashboard](dashboard.png)
+
 ## 🛠 System Component Matrix & Tech Stack
 The architecture relies on specialized, purpose-built technologies to ensure maximum throughput and resilience:
 
